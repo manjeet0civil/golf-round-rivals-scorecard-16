@@ -1,9 +1,11 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface GameCreationProps {
   onGameCreated: (game: any) => void;
@@ -26,34 +28,72 @@ export const GameCreation = ({ onGameCreated, user }: GameCreationProps) => {
     e.preventDefault();
     setIsLoading(true);
 
-    const joinCode = generateJoinCode();
-    const game = {
-      id: Date.now(),
-      name: gameName,
-      courseName,
-      hostId: user.id,
-      hostName: user.name,
-      joinCode,
-      maxPlayers,
-      parValues,
-      players: [{
-        id: user.id,
-        name: user.name,
-        handicap: user.handicap,
-        isHost: true
-      }],
-      status: 'lobby',
-      createdAt: new Date().toISOString()
-    };
+    try {
+      const joinCode = generateJoinCode();
+      
+      // Create the game in Supabase
+      const { data: gameData, error: gameError } = await supabase
+        .from('games')
+        .insert({
+          game_name: gameName,
+          course_name: courseName,
+          host_id: user.id,
+          join_code: joinCode,
+          max_players: maxPlayers,
+          par_values: parValues,
+          status: 'lobby'
+        })
+        .select()
+        .single();
 
-    setTimeout(() => {
+      if (gameError) throw gameError;
+
+      // Add the host as the first player
+      const { error: playerError } = await supabase
+        .from('players')
+        .insert({
+          game_id: gameData.id,
+          user_id: user.id,
+          is_host: true,
+          handicap_at_start: user.handicap || 20
+        });
+
+      if (playerError) throw playerError;
+
+      // Create initial score record
+      const { error: scoreError } = await supabase
+        .from('scores')
+        .insert({
+          game_id: gameData.id,
+          user_id: user.id,
+          strokes: new Array(18).fill(null)
+        });
+
+      if (scoreError) throw scoreError;
+
       toast({
         title: "Game Created!",
         description: `Share join code: ${joinCode}`,
       });
-      onGameCreated(game);
+
+      onGameCreated({
+        ...gameData,
+        players: [{
+          id: user.id,
+          name: user.name,
+          handicap: user.handicap,
+          is_host: true
+        }]
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error creating game",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const updatePar = (holeIndex: number, par: number) => {

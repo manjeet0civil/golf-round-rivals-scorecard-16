@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GameCreation } from '@/components/GameCreation';
@@ -8,6 +8,7 @@ import { GameLobby } from '@/components/GameLobby';
 import { LiveScorecard } from '@/components/LiveScorecard';
 import { GameHistory } from '@/components/GameHistory';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DashboardProps {
   user: any;
@@ -30,16 +31,53 @@ export const Dashboard = ({ user, onLogout }: DashboardProps) => {
     setGameState('lobby');
   };
 
-  const handleGameStart = () => {
-    setGameState('playing');
+  const handleGameStart = async () => {
+    if (!currentGame) return;
+    
+    try {
+      const { error } = await supabase
+        .from('games')
+        .update({ 
+          status: 'in_progress',
+          started_at: new Date().toISOString()
+        })
+        .eq('id', currentGame.id);
+
+      if (error) throw error;
+      
+      setGameState('playing');
+    } catch (error: any) {
+      console.error('Error starting game:', error);
+    }
   };
 
-  const handleGameEnd = () => {
-    setGameState('finished');
-    setTimeout(() => {
-      setGameState(null);
-      setCurrentGame(null);
-    }, 5000);
+  const handleGameEnd = async () => {
+    if (!currentGame) return;
+    
+    try {
+      const { error } = await supabase
+        .from('games')
+        .update({ 
+          status: 'finished',
+          ended_at: new Date().toISOString()
+        })
+        .eq('id', currentGame.id);
+
+      if (error) throw error;
+      
+      setGameState('finished');
+      setTimeout(() => {
+        setGameState(null);
+        setCurrentGame(null);
+      }, 5000);
+    } catch (error: any) {
+      console.error('Error ending game:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    onLogout();
   };
 
   if (gameState === 'lobby') {
@@ -77,7 +115,7 @@ export const Dashboard = ({ user, onLogout }: DashboardProps) => {
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
               <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">Welcome, {user.name}</span>
-              <Button variant="outline" size="sm" onClick={onLogout}>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
                 Logout
               </Button>
             </div>
