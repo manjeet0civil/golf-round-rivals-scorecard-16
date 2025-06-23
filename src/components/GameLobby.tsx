@@ -1,9 +1,10 @@
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface GameLobbyProps {
   game: any;
@@ -13,165 +14,248 @@ interface GameLobbyProps {
 }
 
 export const GameLobby = ({ game, user, onGameStart, onLeaveGame }: GameLobbyProps) => {
-  const [players, setPlayers] = useState(game.players);
+  const [players, setPlayers] = useState(game.players || []);
+  const [isStarting, setIsStarting] = useState(false);
   const { toast } = useToast();
-  const isHost = user.id === game.hostId;
+  const isHost = user.id === game.host_id;
 
   useEffect(() => {
-    // Simulate real-time updates
-    const interval = setInterval(() => {
-      if (Math.random() > 0.8 && players.length < game.maxPlayers) {
-        const newPlayer = {
-          id: Date.now(),
-          name: `Player ${players.length + 1}`,
-          handicap: Math.floor(Math.random() * 20) + 5,
-          isHost: false
-        };
-        setPlayers(prev => [...prev, newPlayer]);
-        toast({
-          title: "Player Joined!",
-          description: `${newPlayer.name} joined the game`,
-        });
-      }
-    }, 5000);
+    // Set up real-time subscription for player changes
+    const channel = supabase
+      .channel(`game-lobby-${game.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'players',
+          filter: `game_id=eq.${game.id}`
+        },
+        async () => {
+          // Refetch players when changes occur
+          const { data: updatedPlayers } = await supabase
+            .from('players')
+            .select(`
+              *,
+              profiles!players_user_id_fkey(name)
+            `)
+            .eq('game_id', game.id);
 
-    return () => clearInterval(interval);
-  }, [players.length, game.maxPlayers, toast]);
+          if (updatedPlayers) {
+            setPlayers(updatedPlayers.map(p => ({
+              id: p.user_id,
+              name: p.profiles?.name || 'Unknown',
+              handicap: p.handicap_at_start,
+              isHost: p.is_host
+            })));
+          }
+        }
+      )
+      .subscribe();
 
-  const handleStartGame = () => {
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [game.id]);
+
+  const handleStartGame = async () => {
     if (players.length < 2) {
       toast({
-        title: "Cannot Start Game",
+        title: "Cannot start game",
         description: "Need at least 2 players to start",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-    onGameStart();
+
+    setIsStarting(true);
+    try {
+      const { error } = await supabase
+        .from('games')
+        .update({ 
+          status: 'in_progress',
+          started_at: new Date().toISOString()
+        })
+        .eq('id', game.id);
+
+      if (error) throw error;
+      
+      onGameStart();
+    } catch (error: any) {
+      toast({
+        title: "Failed to start game",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsStarting(false);
+    }
   };
 
-  const copyJoinCode = async () => {
+  const handleLeaveGame = async () => {
     try {
-      await navigator.clipboard.writeText(game.joinCode);
+      // Remove player from game
+      const { error: playerError } = await supabase
+        .from('players')
+        .delete()
+        .eq('game_id', game.id)
+        .eq('user_id', user.id);
+
+      if (playerError) throw playerError;
+
+      // Remove scores
+      const { error: scoreError } = await supabase
+        .from('scores')
+        .delete()
+        .eq('game_id', game.id)
+        .eq('user_id', user.id);
+
+      if (scoreError) throw scoreError;
+
       toast({
-        title: "Copied!",
-        description: "Join code copied to clipboard",
+        title: "Left game",
+        description: "You have left the game"
       });
-    } catch (err) {
-      console.log('Fallback: Could not copy text');
+      
+      onLeaveGame();
+    } catch (error: any) {
+      toast({
+        title: "Failed to leave game",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
         <Card>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-              <div className="min-w-0 flex-1">
-                <CardTitle className="text-xl sm:text-2xl text-green-800 truncate">{game.name}</CardTitle>
-                <CardDescription className="text-base sm:text-lg truncate">{game.courseName}</CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-2xl text-green-800">{game.game_name}</CardTitle>
+                <p className="text-gray-600">{game.course_name}</p>
               </div>
-              <Button variant="outline" onClick={onLeaveGame} className="w-full sm:w-auto">
-                Leave Game
-              </Button>
+              <div className="text-right">
+                <Badge variant="secondary" className="text-lg px-3 py-1">
+                  {game.join_code}
+                </Badge>
+                <p className="text-sm text-gray-500 mt-1">Join Code</p>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-600">Join Code</p>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                  <code className="bg-gray-100 px-3 py-2 rounded font-mono text-lg break-all">
-                    {game.joinCode}
-                  </code>
-                  <Button variant="outline" size="sm" onClick={copyJoinCode} className="w-full sm:w-auto">
-                    Copy
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-600">Players</p>
-                <p className="text-lg">
-                  {players.length} / {game.maxPlayers} joined
-                </p>
-              </div>
-            </div>
+        </Card>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Players ({players.length}/{game.max_players})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
               {players.map((player) => (
                 <div 
                   key={player.id}
-                  className="bg-white p-3 rounded-lg border flex items-center justify-between"
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    player.id === user.id ? 'bg-blue-50 border-blue-200 border' : 'bg-white border'
+                  }`}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{player.name}</p>
-                    <p className="text-sm text-gray-600">Handicap: {player.handicap}</p>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <span className="text-green-800 font-semibold">
+                        {player.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium">{player.name}</p>
+                      <p className="text-sm text-gray-600">Handicap: {player.handicap}</p>
+                    </div>
                   </div>
-                  {player.isHost && (
-                    <Badge variant="secondary" className="ml-2">Host</Badge>
-                  )}
+                  <div className="flex items-center space-x-2">
+                    {player.isHost && (
+                      <Badge variant="default">Host</Badge>
+                    )}
+                    {player.id === user.id && (
+                      <Badge variant="secondary">You</Badge>
+                    )}
+                  </div>
                 </div>
               ))}
+
+              {players.length < game.max_players && (
+                <div className="flex items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg">
+                  <div className="text-center">
+                    <p className="text-gray-500">Waiting for more players...</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Share the join code: <strong>{game.join_code}</strong>
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-
-            {isHost && (
-              <div className="flex space-x-3">
-                <Button 
-                  onClick={handleStartGame}
-                  className="bg-green-600 hover:bg-green-700"
-                  disabled={players.length < 2}
-                >
-                  Start Game
-                </Button>
-                <Button variant="destructive">
-                  End Game
-                </Button>
-              </div>
-            )}
-
-            {!isHost && (
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-blue-800">
-                  ⏳ Waiting for host to start the game...
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">Course Information</CardTitle>
+            <CardTitle>Course Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <div className="grid grid-cols-10 gap-1 sm:gap-2 text-center text-xs sm:text-sm min-w-max">
-                <div className="font-medium">Hole</div>
-                {Array.from({length: 9}, (_, i) => (
-                  <div key={i} className="font-medium">{i + 1}</div>
-                ))}
-                
-                <div className="font-medium">Par</div>
-                {game.parValues.slice(0, 9).map((par, i) => (
-                  <div key={i} className="bg-green-100 p-1 rounded">{par}</div>
-                ))}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-medium mb-2">Front 9</h4>
+                <div className="grid grid-cols-9 gap-1 text-sm">
+                  {game.par_values.slice(0, 9).map((par, i) => (
+                    <div key={i} className="text-center p-1 bg-green-50 rounded">
+                      <div className="text-xs text-gray-500">{i + 1}</div>
+                      <div className="font-medium">{par}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              
-              <div className="grid grid-cols-10 gap-1 sm:gap-2 text-center text-xs sm:text-sm mt-4 min-w-max">
-                <div className="font-medium">Hole</div>
-                {Array.from({length: 9}, (_, i) => (
-                  <div key={i} className="font-medium">{i + 10}</div>
-                ))}
-                
-                <div className="font-medium">Par</div>
-                {game.parValues.slice(9, 18).map((par, i) => (
-                  <div key={i} className="bg-green-100 p-1 rounded">{par}</div>
-                ))}
+              <div>
+                <h4 className="font-medium mb-2">Back 9</h4>
+                <div className="grid grid-cols-9 gap-1 text-sm">
+                  {game.par_values.slice(9, 18).map((par, i) => (
+                    <div key={i} className="text-center p-1 bg-green-50 rounded">
+                      <div className="text-xs text-gray-500">{i + 10}</div>
+                      <div className="font-medium">{par}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
+            </div>
+            <div className="mt-4 text-center">
+              <p className="text-lg">
+                Total Par: <span className="font-bold">{game.par_values.reduce((sum, par) => sum + par, 0)}</span>
+              </p>
             </div>
           </CardContent>
         </Card>
+
+        <div className="flex space-x-4">
+          {isHost ? (
+            <Button 
+              onClick={handleStartGame} 
+              className="flex-1 bg-green-600 hover:bg-green-700"
+              disabled={isStarting || players.length < 2}
+            >
+              {isStarting ? "Starting..." : "Start Game"}
+            </Button>
+          ) : (
+            <div className="flex-1 text-center p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-800">Waiting for host to start the game...</p>
+            </div>
+          )}
+          
+          <Button 
+            variant="outline" 
+            onClick={handleLeaveGame}
+            className="px-8"
+          >
+            Leave Game
+          </Button>
+        </div>
       </div>
     </div>
   );

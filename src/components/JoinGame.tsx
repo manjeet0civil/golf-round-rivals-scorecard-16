@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface JoinGameProps {
   onGameJoined: (game: any) => void;
@@ -20,42 +21,123 @@ export const JoinGame = ({ onGameJoined, user }: JoinGameProps) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate finding and joining a game
-    setTimeout(() => {
-      const game = {
-        id: Date.now(),
-        name: "Demo Game",
-        courseName: "Demo Course",
-        hostId: '999',
-        hostName: 'Demo Host',
-        joinCode: joinCode.toUpperCase(),
-        maxPlayers: 4,
-        parValues: Array(18).fill(4),
-        players: [
-          {
-            id: '999',
-            name: 'Demo Host',
-            handicap: 12,
-            isHost: true
-          },
-          {
-            id: user.id,
-            name: user.name,
-            handicap: user.handicap,
-            isHost: false
-          }
-        ],
-        status: 'lobby',
-        createdAt: new Date().toISOString()
+    try {
+      // Find the game by join code
+      const { data: gameData, error: gameError } = await supabase
+        .from('games')
+        .select('*')
+        .eq('join_code', joinCode.toUpperCase())
+        .eq('status', 'lobby')
+        .single();
+
+      if (gameError || !gameData) {
+        throw new Error('Game not found or already started');
+      }
+
+      // Check if user is already in this game
+      const { data: existingPlayer } = await supabase
+        .from('players')
+        .select('*')
+        .eq('game_id', gameData.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (existingPlayer) {
+        // User is already in the game, just join
+        const { data: players } = await supabase
+          .from('players')
+          .select(`
+            *,
+            profiles!players_user_id_fkey(name)
+          `)
+          .eq('game_id', gameData.id);
+
+        const gameWithPlayers = {
+          ...gameData,
+          players: players?.map(p => ({
+            id: p.user_id,
+            name: p.profiles?.name || 'Unknown',
+            handicap: p.handicap_at_start,
+            isHost: p.is_host
+          })) || []
+        };
+
+        toast({
+          title: "Rejoined Game!",
+          description: `Welcome back to ${gameData.game_name}`,
+        });
+        
+        onGameJoined(gameWithPlayers);
+        return;
+      }
+
+      // Check if game is full
+      const { count: playerCount } = await supabase
+        .from('players')
+        .select('*', { count: 'exact' })
+        .eq('game_id', gameData.id);
+
+      if ((playerCount || 0) >= gameData.max_players) {
+        throw new Error('Game is full');
+      }
+
+      // Add player to the game
+      const { error: playerError } = await supabase
+        .from('players')
+        .insert({
+          game_id: gameData.id,
+          user_id: user.id,
+          handicap_at_start: user.handicap || 20,
+          is_host: false
+        });
+
+      if (playerError) throw playerError;
+
+      // Create initial score record
+      const { error: scoreError } = await supabase
+        .from('scores')
+        .insert({
+          game_id: gameData.id,
+          user_id: user.id,
+          strokes: new Array(18).fill(null)
+        });
+
+      if (scoreError) throw scoreError;
+
+      // Get all players for the game
+      const { data: players } = await supabase
+        .from('players')
+        .select(`
+          *,
+          profiles!players_user_id_fkey(name)
+        `)
+        .eq('game_id', gameData.id);
+
+      const gameWithPlayers = {
+        ...gameData,
+        players: players?.map(p => ({
+          id: p.user_id,
+          name: p.profiles?.name || 'Unknown',
+          handicap: p.handicap_at_start,
+          isHost: p.is_host
+        })) || []
       };
 
       toast({
         title: "Game Joined!",
-        description: `Successfully joined ${game.name}`,
+        description: `Successfully joined ${gameData.game_name}`,
       });
-      onGameJoined(game);
+      
+      onGameJoined(gameWithPlayers);
+    } catch (error: any) {
+      toast({
+        title: "Failed to join game",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
