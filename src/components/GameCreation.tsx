@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,13 +63,13 @@ export const GameCreation = ({ onGameCreated, user }: GameCreationProps) => {
   };
 
   return (
-    <Card>
+    <Card className="h-fit">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
+        <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl">
           <span>🏌️</span>
           <span>Create New Game</span>
         </CardTitle>
-        <CardDescription>Set up a new golf round for you and your friends</CardDescription>
+        <CardDescription className="text-sm">Set up a new golf round for you and your friends</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -110,11 +109,11 @@ export const GameCreation = ({ onGameCreated, user }: GameCreationProps) => {
           </div>
 
           <div className="space-y-2">
-            <Label>Course Par Values</Label>
-            <div className="grid grid-cols-6 gap-2 text-sm">
+            <Label className="text-sm font-medium">Course Par Values</Label>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-sm">
               {parValues.map((par, index) => (
                 <div key={index} className="space-y-1">
-                  <label className="text-xs text-gray-500">H{index + 1}</label>
+                  <label className="text-xs text-gray-500 block text-center">H{index + 1}</label>
                   <select 
                     value={par}
                     onChange={(e) => updatePar(index, parseInt(e.target.value))}
@@ -131,7 +130,7 @@ export const GameCreation = ({ onGameCreated, user }: GameCreationProps) => {
 
           <Button 
             type="submit" 
-            className="w-full bg-green-600 hover:bg-green-700" 
+            className="w-full bg-green-600 hover:bg-green-700 text-sm sm:text-base" 
             disabled={isLoading}
           >
             {isLoading ? "Creating Game..." : "Create Game & Get Join Code"}

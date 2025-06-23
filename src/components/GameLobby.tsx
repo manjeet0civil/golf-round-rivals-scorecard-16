@@ -64,28 +64,28 @@ export const GameLobby = ({ game, user, onGameStart, onLeaveGame }: GameLobbyPro
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-2xl text-green-800">{game.name}</CardTitle>
-                <CardDescription className="text-lg">{game.courseName}</CardDescription>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-xl sm:text-2xl text-green-800 truncate">{game.name}</CardTitle>
+                <CardDescription className="text-base sm:text-lg truncate">{game.courseName}</CardDescription>
               </div>
-              <Button variant="outline" onClick={onLeaveGame}>
+              <Button variant="outline" onClick={onLeaveGame} className="w-full sm:w-auto">
                 Leave Game
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-600">Join Code</p>
-                <div className="flex items-center space-x-2">
-                  <code className="bg-gray-100 px-3 py-2 rounded font-mono text-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                  <code className="bg-gray-100 px-3 py-2 rounded font-mono text-lg break-all">
                     {game.joinCode}
                   </code>
-                  <Button variant="outline" size="sm" onClick={copyJoinCode}>
+                  <Button variant="outline" size="sm" onClick={copyJoinCode} className="w-full sm:w-auto">
                     Copy
                   </Button>
                 </div>
@@ -98,18 +98,18 @@ export const GameLobby = ({ game, user, onGameStart, onLeaveGame }: GameLobbyPro
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
               {players.map((player) => (
                 <div 
                   key={player.id}
                   className="bg-white p-3 rounded-lg border flex items-center justify-between"
                 >
-                  <div>
-                    <p className="font-medium">{player.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{player.name}</p>
                     <p className="text-sm text-gray-600">Handicap: {player.handicap}</p>
                   </div>
                   {player.isHost && (
-                    <Badge variant="secondary">Host</Badge>
+                    <Badge variant="secondary" className="ml-2">Host</Badge>
                   )}
                 </div>
               ))}
@@ -142,31 +142,33 @@ export const GameLobby = ({ game, user, onGameStart, onLeaveGame }: GameLobbyPro
 
         <Card>
           <CardHeader>
-            <CardTitle>Course Information</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Course Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-9 gap-2 text-center text-sm">
-              <div className="font-medium">Hole</div>
-              {Array.from({length: 9}, (_, i) => (
-                <div key={i} className="font-medium">{i + 1}</div>
-              ))}
+            <div className="overflow-x-auto">
+              <div className="grid grid-cols-10 gap-1 sm:gap-2 text-center text-xs sm:text-sm min-w-max">
+                <div className="font-medium">Hole</div>
+                {Array.from({length: 9}, (_, i) => (
+                  <div key={i} className="font-medium">{i + 1}</div>
+                ))}
+                
+                <div className="font-medium">Par</div>
+                {game.parValues.slice(0, 9).map((par, i) => (
+                  <div key={i} className="bg-green-100 p-1 rounded">{par}</div>
+                ))}
+              </div>
               
-              <div className="font-medium">Par</div>
-              {game.parValues.slice(0, 9).map((par, i) => (
-                <div key={i} className="bg-green-100 p-1 rounded">{par}</div>
-              ))}
-            </div>
-            
-            <div className="grid grid-cols-9 gap-2 text-center text-sm mt-4">
-              <div className="font-medium">Hole</div>
-              {Array.from({length: 9}, (_, i) => (
-                <div key={i} className="font-medium">{i + 10}</div>
-              ))}
-              
-              <div className="font-medium">Par</div>
-              {game.parValues.slice(9, 18).map((par, i) => (
-                <div key={i} className="bg-green-100 p-1 rounded">{par}</div>
-              ))}
+              <div className="grid grid-cols-10 gap-1 sm:gap-2 text-center text-xs sm:text-sm mt-4 min-w-max">
+                <div className="font-medium">Hole</div>
+                {Array.from({length: 9}, (_, i) => (
+                  <div key={i} className="font-medium">{i + 10}</div>
+                ))}
+                
+                <div className="font-medium">Par</div>
+                {game.parValues.slice(9, 18).map((par, i) => (
+                  <div key={i} className="bg-green-100 p-1 rounded">{par}</div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -68,41 +67,41 @@ export const GameHistory = ({ user }: GameHistoryProps) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">{gameHistory.length}</p>
-              <p className="text-sm text-gray-600">Games Played</p>
+              <p className="text-xl sm:text-2xl font-bold text-green-600">{gameHistory.length}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Games Played</p>
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">{getAverageScore()}</p>
-              <p className="text-sm text-gray-600">Average Net Score</p>
+              <p className="text-xl sm:text-2xl font-bold text-green-600">{getAverageScore()}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Average Net Score</p>
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">{getWinRate()}%</p>
-              <p className="text-sm text-gray-600">Win Rate</p>
+              <p className="text-xl sm:text-2xl font-bold text-green-600">{getWinRate()}%</p>
+              <p className="text-xs sm:text-sm text-gray-600">Win Rate</p>
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">{user.handicap}</p>
-              <p className="text-sm text-gray-600">Current Handicap</p>
+              <p className="text-xl sm:text-2xl font-bold text-green-600">{user.handicap}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Current Handicap</p>
             </div>
           </CardContent>
         </Card>
@@ -111,7 +110,7 @@ export const GameHistory = ({ user }: GameHistoryProps) => {
       {/* Game History */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Games</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">Recent Games</CardTitle>
           <CardDescription>Your golf game history and statistics</CardDescription>
         </CardHeader>
         <CardContent>
@@ -121,42 +120,40 @@ export const GameHistory = ({ user }: GameHistoryProps) => {
                 key={game.id}
                 className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className="text-2xl">{getRankMedal(game.rank)}</span>
-                      <div>
-                        <h3 className="font-semibold text-lg">{game.name}</h3>
-                        <p className="text-gray-600">{game.courseName}</p>
-                      </div>
+                <div className="flex flex-col space-y-3">
+                  <div className="flex items-start space-x-3">
+                    <span className="text-2xl">{getRankMedal(game.rank)}</span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-base sm:text-lg truncate">{game.name}</h3>
+                      <p className="text-gray-600 text-sm truncate">{game.courseName}</p>
                     </div>
-                    
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <Badge variant="outline">
-                        {game.rank}/{game.totalPlayers} place
-                      </Badge>
-                      <Badge variant="secondary">
-                        Net: {game.netScore}
-                      </Badge>
-                      <Badge variant="outline">
-                        Gross: {game.totalScore}
-                      </Badge>
-                    </div>
-                    
-                    <p className="text-sm text-gray-500">
-                      Played on {new Date(game.date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </p>
                   </div>
                   
-                  <div className="mt-4 sm:mt-0 flex space-x-2">
-                    <Button variant="outline" size="sm">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {game.rank}/{game.totalPlayers} place
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      Net: {game.netScore}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      Gross: {game.totalScore}
+                    </Badge>
+                  </div>
+                  
+                  <p className="text-xs sm:text-sm text-gray-500">
+                    Played on {new Date(game.date).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs">
                       View Scorecard
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs">
                       Download PDF
                     </Button>
                   </div>
